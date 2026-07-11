@@ -1,0 +1,118 @@
+{
+  "source": "Query.xlsx",
+  "cutoff": "Cierre de junio 2026",
+  "sheets": {
+    "Directorio": {
+      "xml_rows": 979,
+      "non_empty_rows": 970
+    },
+    "Instrucciones": {
+      "xml_rows": 11,
+      "non_empty_rows": 11
+    },
+    "Query": {
+      "xml_rows": 13901,
+      "non_empty_rows": 13901
+    }
+  },
+  "query_header_row": 2,
+  "headers_found": [
+    "NUM_EMP",
+    "NOMBRE",
+    "NOMP_EMP",
+    "AP_PATER",
+    "AP_MATER",
+    "F_ALTA",
+    "F_INGRESO",
+    "F_BAJA",
+    "CCOSTO",
+    "NOM_CCOSTO",
+    "TURNO",
+    "PUESTO",
+    "NOM_PUESTO",
+    "TIPO_NOM",
+    "REGION",
+    "TIPO_EMP",
+    "SEXO",
+    "F.NAC",
+    "M_BAJA",
+    "MOTIVO DE BAJA",
+    "C_BAJA",
+    "DESCRIPCION",
+    "EDAD",
+    "RANGO",
+    "ANT.",
+    "ANTIGÜEDAD",
+    "YEAR",
+    "GENERACION",
+    "STATUS",
+    "cc",
+    "STATUS_ EMP (ACTIVO/BAJA)",
+    "INGRESOS DEL MES",
+    "MES",
+    "AÑO",
+    "ZONAS CRÍTICAS",
+    "Estado",
+    "DIVISION",
+    "DM"
+  ],
+  "required_headers_found": 38,
+  "required_headers_total": 38,
+  "source_data_rows": 13899,
+  "status_counts": {
+    "ACTIVOS": 13899
+  },
+  "active_rows_before_exact_dedup": 13899,
+  "exact_duplicate_rows_removed": 0,
+  "exact_duplicate_excel_rows": [],
+  "active_unique_rows_exported": 13899,
+  "duplicate_employee_numbers": 0,
+  "invalid_ingreso_rows": 0,
+  "invalid_nacimiento_rows": 0,
+  "instructions": [
+    [
+      "NUM_EMP",
+      "# Empleado"
+    ],
+    [
+      "NOMBRE",
+      "Nombre del Partner"
+    ],
+    [
+      "F_INGRESO",
+      "En funcion de la Fecha de Alta Calcular Tiempo en la Marca ( Servira para Hacer en la Pestaña Aniversarios)"
+    ],
+    [
+      "NOM_CCOSTO",
+      "Tienda"
+    ],
+    [
+      "TURNO",
+      "Jornada"
+    ],
+    [
+      "NOM_PUESTO",
+      "Puesto"
+    ],
+    [
+      "SEXO",
+      "F= Femenino , M= Masculino"
+    ],
+    [
+      "F.NAC",
+      "En funcion de la Fecha de Alta Calcular Tiempo en la Marca ( Servira para Hacer en la pestaña Cumpleaños) Si colocar Edad"
+    ],
+    [
+      "cc",
+      "Centro de Costos"
+    ],
+    [
+      "DM",
+      "DM Correcto"
+    ],
+    [
+      "REGION",
+      "Region Correcta"
+    ]
+  ]
+}

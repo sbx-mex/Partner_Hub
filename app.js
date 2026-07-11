@@ -41,7 +41,7 @@ function init(){
   ['pRegion','pDM','pStore','pRole','pSearch','aRegion','aDM','aStore','aMonth','aSearch','bRegion','bDM','bStore','bMonth','bSearch']
     .forEach(id => $(id)?.addEventListener('input', renderAll));
   renderAll();
-  if('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js?v=7.0.2');
+  if('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js?v=june-2026-v1');
 }
 
 function cascade(prefix){

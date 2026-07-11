@@ -1,0 +1,10 @@
+PARTNER HUB - AUDITORÍA CIERRE DE JUNIO 2026
+
+Filas fuente Query: 13899
+Partners activos identificados: 13899
+Duplicados exactos removidos: 0
+Partners activos exportados: 13899
+Encabezados requeridos encontrados: 38/38
+Fechas de ingreso inválidas: 0
+Fechas de nacimiento inválidas: 0
+Estados detectados: {"ACTIVOS": 13899}
