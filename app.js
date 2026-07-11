@@ -1,7 +1,11 @@
 const H = window.PARTNER_HEADERS || [];
+const normalizeValue = value => String(value ?? '').trim();
 const R = (window.PARTNER_ROWS || [])
-  .map(r => Object.fromEntries(H.map((h, i) => [h, r[i] || ''])))
-  .filter(x => x.nombre && x.region);
+  .map(r => Object.fromEntries(H.map((h, i) => [h, normalizeValue(r[i])])))
+  .filter(x => x.nombre);
+
+const FILTER_IDS = ['pRegion','pDM','pStore','pRole','aRegion','aDM','aStore','aMonth','bRegion','bDM','bStore','bMonth'];
+const STORAGE_KEY = 'partnerHub.filters.v2';
 
 const MAX_REGISTROS = 30;
 const months = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
@@ -10,7 +14,7 @@ today.setHours(0,0,0,0);
 const currentMonth = today.getMonth() + 1;
 const currentYear = today.getFullYear();
 const $ = id => document.getElementById(id);
-const uniq = a => [...new Set(a.filter(Boolean))].sort((a,b)=>a.localeCompare(b,'es'));
+const uniq = a => [...new Set(a.map(normalizeValue).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'es',{sensitivity:'base'}));
 const roleOrder = ['Gerente','Subgerente','Supervisor','Barista','Otros'];
 
 const clean = s => String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
@@ -19,9 +23,52 @@ const roleRank = p => { const i = roleOrder.indexOf(roleName(p)); return i >= 0 
 const esc = s => String(s || '').replace(/[&<>"]/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));
 
 function dateParts(s){ if(!s) return null; const d = new Date(s + 'T00:00:00'); return isNaN(d) ? null : {d, day:d.getDate(), month:d.getMonth()+1, year:d.getFullYear()}; }
-function fillSelect(el, items, all='Todas'){ if(!el) return; el.innerHTML = `<option value="">${all}</option>` + items.map(x => `<option>${esc(x)}</option>`).join(''); }
-function fillDatalist(el, items){ if(!el) return; el.innerHTML = items.map(x => `<option value="${esc(x)}"></option>`).join(''); }
+function fillSelect(el, items, all='Todos'){
+  if(!el) return;
+  const previous = normalizeValue(el.value);
+  el.innerHTML = `<option value="">${all}</option>` + uniq(items).map(x => `<option value="${esc(x)}">${esc(x)}</option>`).join('');
+  el.value = [...el.options].some(o => o.value === previous) ? previous : '';
+  refreshSlicer(el);
+}
+function fillDatalist(){ /* Compatibilidad con versiones anteriores. */ }
 function monthOptions(el){ el.innerHTML = `<option value="">Todos</option>` + months.map((m,i)=>`<option value="${i+1}" ${i+1===currentMonth?'selected':''}>${m}</option>`).join(''); }
+
+function enhanceSelect(select){
+  if(!select || select.dataset.enhanced) return;
+  select.dataset.enhanced = 'true';
+  select.classList.add('native-slicer');
+  const shell = document.createElement('div');
+  shell.className = 'slicer';
+  shell.innerHTML = `<button type="button" class="slicer-trigger" aria-expanded="false"><span>Todos</span><i>⌄</i></button><div class="slicer-menu"><div class="slicer-tools"><input type="search" placeholder="Buscar..." aria-label="Buscar opción"><button type="button" class="slicer-clear" title="Limpiar selección">Limpiar</button></div><div class="slicer-options"></div></div>`;
+  select.after(shell);
+  const trigger=shell.querySelector('.slicer-trigger'), menu=shell.querySelector('.slicer-menu'), search=shell.querySelector('input'), clear=shell.querySelector('.slicer-clear');
+  trigger.addEventListener('click', e => { e.stopPropagation(); document.querySelectorAll('.slicer.open').forEach(x=>x!==shell&&x.classList.remove('open')); shell.classList.toggle('open'); trigger.setAttribute('aria-expanded', shell.classList.contains('open')); if(shell.classList.contains('open')) search.focus(); });
+  search.addEventListener('input', () => refreshSlicer(select, search.value));
+  clear.addEventListener('click', () => { select.value=''; select.dispatchEvent(new Event('input',{bubbles:true})); shell.classList.remove('open'); });
+  shell._select = select;
+  refreshSlicer(select);
+}
+function refreshSlicer(select, term=''){
+  if(!select || !select.dataset.enhanced) return;
+  const shell=select.nextElementSibling;
+  if(!shell?.classList.contains('slicer')) return;
+  const current=normalizeValue(select.value), q=clean(term), options=[...select.options].filter(o=>!q||clean(o.textContent).includes(q));
+  shell.querySelector('.slicer-trigger span').textContent = select.selectedOptions[0]?.textContent || 'Todos';
+  shell.querySelector('.slicer-options').innerHTML = options.map(o=>`<button type="button" class="slicer-option ${o.value===current?'active':''}" data-value="${esc(o.value)}"><span>${esc(o.textContent)}</span>${o.value===current?'<b>✓</b>':''}</button>`).join('') || '<small class="slicer-empty">Sin coincidencias</small>';
+  shell.querySelectorAll('.slicer-option').forEach(btn=>btn.addEventListener('click',()=>{ select.value=btn.dataset.value; select.dispatchEvent(new Event('input',{bubbles:true})); shell.classList.remove('open'); }));
+}
+function persistFilters(){
+  const state={}; FILTER_IDS.forEach(id=>{ if($(id)) state[id]=$(id).value; });
+  try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }catch(_){ }
+}
+function restoreFilters(){
+  let state={}; try{ state=JSON.parse(localStorage.getItem(STORAGE_KEY)||'{}'); }catch(_){ }
+  ['pRegion','aRegion','bRegion','pRole','aMonth','bMonth'].forEach(id=>{ if($(id)&&[...$(id).options].some(o=>o.value===state[id])) $(id).value=state[id]; });
+  ['p','a','b'].forEach(prefix=>{ cascade(prefix); const dm=$(prefix+'DM'), store=$(prefix+'Store'); if(dm&&[...dm.options].some(o=>o.value===state[prefix+'DM'])) dm.value=state[prefix+'DM']; cascade(prefix); if(store&&[...store.options].some(o=>o.value===state[prefix+'Store'])) store.value=state[prefix+'Store']; });
+  FILTER_IDS.forEach(id=>refreshSlicer($(id)));
+}
+document.addEventListener('click',()=>document.querySelectorAll('.slicer.open').forEach(x=>x.classList.remove('open')));
+
 function layoutClass(count){ if(count <= 8) return 'premium'; if(count <= 16) return 'sixteen'; if(count <= 24) return 'medium'; return 'compact'; }
 function chunk(arr, size){ return Array.from({length: Math.ceil(arr.length / size)}, (_, i) => arr.slice(i*size, i*size + size)); }
 function monthShort(n){ return months[n-1].slice(0,3).toUpperCase(); }
@@ -32,16 +79,15 @@ function init(){
     b.classList.add('active');
     $(b.dataset.tab).classList.add('active');
   });
-  ['pRegion','aRegion','bRegion'].forEach(id => fillSelect($(id), uniq(R.map(x=>x.region))));
+  ['pRegion','aRegion','bRegion'].forEach(id => fillSelect($(id), R.map(x=>x.region), 'Todos'));
   ['aMonth','bMonth'].forEach(id => monthOptions($(id)));
-  fillSelect($('pRole'), roleOrder.filter(x=>x!=='Otros'), 'Todas');
-  fillDatalist($('pStoreList'), uniq(R.map(x=>x.tienda)));
-  fillDatalist($('aStoreList'), uniq(R.map(x=>x.tienda)));
-  fillDatalist($('bStoreList'), uniq(R.map(x=>x.tienda)));
+  fillSelect($('pRole'), roleOrder.filter(x=>x!=='Otros'), 'Todos');
+  FILTER_IDS.forEach(id => enhanceSelect($(id)));
+  restoreFilters();
   ['pRegion','pDM','pStore','pRole','pSearch','aRegion','aDM','aStore','aMonth','aSearch','bRegion','bDM','bStore','bMonth','bSearch']
-    .forEach(id => $(id)?.addEventListener('input', renderAll));
+    .forEach(id => $(id)?.addEventListener('input', () => { persistFilters(); renderAll(); }));
   renderAll();
-  if('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js?v=june-2026-v1');
+  if('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js?v=region-filters-v2');
 }
 
 function cascade(prefix){
@@ -55,8 +101,9 @@ function cascade(prefix){
   if(dms.includes(oldDM)) $(prefix+'DM').value = oldDM;
   list = list.filter(x => !$(prefix+'DM')?.value || x.dm === $(prefix+'DM').value);
   const stores = uniq(list.map(x=>x.tienda));
-  fillDatalist($(prefix+'StoreList'), stores);
-  if(storeEl && oldStore && !stores.includes(oldStore)) storeEl.value = '';
+  fillSelect(storeEl, stores, 'Todos');
+  if(storeEl) storeEl.value = stores.includes(oldStore) ? oldStore : '';
+  refreshSlicer(storeEl);
 }
 function filterBase(prefix){
   const region = $(prefix+'Region')?.value || '', dm = $(prefix+'DM')?.value || '', store = $(prefix+'Store')?.value || '';

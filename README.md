@@ -1,33 +1,41 @@
-# Partner Hub 2.0 – Cierre de junio 2026
+# Partner Hub 2.1 - Región y filtros dependientes
 
-Versión funcional actualizada con `Query.xlsx`, lista para GitHub Pages y PWA.
+Versión funcional actualizada con `Query.xlsx`, preparada para GitHub Pages y PWA.
 
-## Actualización de datos
+## Datos procesados
 
-- Pestañas leídas completamente: `Directorio`, `Instrucciones` y `Query`.
-- Lectura por nombre de encabezado, sin posiciones fijas.
-- Filas de datos detectadas en `Query`: **13,899**.
-- Partners activos identificados: **13,899**.
-- Duplicados exactos removidos: **0**.
-- Partners activos publicados: **13,899**.
-- Encabezados requeridos encontrados: **38/38**.
+- Hoja fuente: `Query`.
+- Encabezados identificados: **39/39**.
+- Filas procesadas y publicadas: **13,899**.
+- `REGION` se lee por el nombre exacto del encabezado, sin posiciones fijas.
+- Regiones: **11**.
+- DM: **77**.
+- Tiendas: **951**.
 
-## Funcionalidad conservada
+## Correcciones y mejoras
 
-- Vista Partner con KPIs, jerarquía, buscador y filtros dependientes.
-- Aniversarios y cumpleaños con filtros, paginación y exportación para impresión/PDF.
-- Cálculo de antigüedad y edad desde `F_INGRESO` y `F.NAC`.
-- Relaciones por centro de costos, DM, región y división conservadas desde la fuente.
-- PWA y rutas relativas compatibles con GitHub Pages.
+- Corrección del filtro Región para usar exclusivamente `Query[REGION]`.
+- Normalización de espacios, valores vacíos, orden alfabético y duplicados visuales.
+- Filtros de selección única con estilo slicer.
+- Búsqueda, opción `Todos`, botón `Limpiar` y scroll interno.
+- Navegación dependiente `Región → DM → Tienda`.
+- Persistencia de filtros con `localStorage`.
+- Actualización inmediata de KPIs, jerarquías, aniversarios y cumpleaños.
+- Diseño general y lógica existente conservados.
 
 ## Archivos de auditoría
 
-- `AUDITORIA_JUNIO_2026.txt`
+- `AUDITORIA_REGION_FILTROS.txt`
+- `data/audit-query.json`
 - `data/audit-june.json`
+
+## Fuente incluida
+
+El archivo utilizado se conserva en `data/Query.xlsx`.
 
 ## Publicación en GitHub Pages
 
-1. Subir el contenido de esta carpeta a la rama principal del repositorio.
-2. Abrir **Settings → Pages**.
-3. Seleccionar **Deploy from a branch**.
-4. Elegir la rama principal y la carpeta raíz `/`.
+1. Sube el contenido de esta carpeta a la rama principal.
+2. Abre **Settings → Pages**.
+3. Selecciona **Deploy from a branch**.
+4. Elige la rama principal y la carpeta raíz `/`.

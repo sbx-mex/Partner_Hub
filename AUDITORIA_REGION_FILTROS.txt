@@ -1,0 +1,35 @@
+AUDITORIA PARTNER HUB - REGION Y FILTROS
+Fecha: 2026-07-11
+
+FUENTE
+- Archivo: Query.xlsx
+- Hoja: Query
+- Fila de encabezados: 2
+- Columnas identificadas: 39/39
+- Filas procesadas: 13,899
+- Filas publicadas: 13,899
+- Filas con REGION vacia: 0
+
+CORRECCION PRINCIPAL
+- REGION se obtiene exclusivamente del encabezado exacto Query[REGION].
+- No se usa DIVISION, Estado, TIPO_NOM ni una posicion fija como sustituto.
+- Los valores se normalizan eliminando espacios al inicio y al final.
+- Regiones unicas: 11.
+- DM unicos: 77.
+- Tiendas unicas: 951.
+
+FILTROS
+- Seleccion unica en Region, DM, Tienda, Posicion y Mes.
+- Opcion Todos como seleccion unica.
+- Busqueda dentro de cada slicer.
+- Boton Limpiar.
+- Orden alfabetico y eliminacion de duplicados visuales.
+- Dependencia Region -> DM -> Tienda.
+- Selecciones invalidas se limpian al cambiar el contexto superior.
+- Persistencia mediante localStorage durante la navegacion.
+
+COMPATIBILIDAD
+- Rutas relativas conservadas.
+- Service Worker actualizado.
+- Compatible con publicacion desde la raiz de GitHub Pages.
+- No se modificaron formulas de KPIs, aniversarios, cumpleanos ni exportacion.

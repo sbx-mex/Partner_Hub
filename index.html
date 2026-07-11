@@ -3,16 +3,16 @@
 <main class="wrap">
 <nav class="tabs"><button class="tab active" data-tab="partner">Partner</button><button class="tab" data-tab="anniv">Aniversarios</button><button class="tab" data-tab="birth">Cumpleaños</button></nav>
 <section id="partner" class="panel active">
-  <div class="filters five"><label>Región<select id="pRegion"></select></label><label>DM<select id="pDM"></select></label><label>Tienda<input id="pStore" list="pStoreList" placeholder="Buscar tienda"><datalist id="pStoreList"></datalist></label><label>Posición<select id="pRole"></select></label><label>Buscar<input id="pSearch" placeholder="Partner o # empleado"></label></div>
+  <div class="filters five"><label>Región<select id="pRegion"></select></label><label>DM<select id="pDM"></select></label><label>Tienda<select id="pStore"></select></label><label>Posición<select id="pRole"></select></label><label>Buscar<input id="pSearch" placeholder="Partner o # empleado"></label></div>
   <div class="grid"><aside class="card summary"><h2 id="storeTitle">Resumen Partner</h2><p id="storeMeta"></p><div class="kpis"><div><b id="kPartners">0</b><span>Partners</span></div><div><b id="kStores">0</b><span>Tiendas</span></div><div><b id="kDMs">0</b><span>DM</span></div><div><b id="kGerentes">0</b><span>Gerentes</span></div><div><b id="kSup">0</b><span>Supervisores</span></div><div><b id="kBar">0</b><span>Baristas</span></div></div><div class="donut" id="donut"><span id="donutPct">0%</span></div><div class="legend"><b id="womenPct">0% Mujeres</b><b id="menPct">0% Hombres</b></div><h3>Por posición</h3><div id="roleBars"></div><h3>Rango de edad</h3><div id="ageBars"></div></aside><section id="hierarchy" class="list"></section></div>
 </section>
 <section id="anniv" class="panel">
-  <div class="filters five"><label>Región<select id="aRegion"></select></label><label>DM<select id="aDM"></select></label><label>Tienda<input id="aStore" list="aStoreList" placeholder="Buscar tienda"><datalist id="aStoreList"></datalist></label><label>Mes<select id="aMonth"></select></label><label>Buscar<input id="aSearch" placeholder="Partner o tienda"></label></div>
+  <div class="filters five"><label>Región<select id="aRegion"></select></label><label>DM<select id="aDM"></select></label><label>Tienda<select id="aStore"></select></label><label>Mes<select id="aMonth"></select></label><label>Buscar<input id="aSearch" placeholder="Partner o tienda"></label></div>
   <div class="toolbar"><strong id="aCount">0 aniversarios</strong><button onclick="printPanel('anniv')">Exportar PDF / Imprimir</button></div>
   <div id="aSlides" class="slides"></div>
 </section>
 <section id="birth" class="panel">
-  <div class="filters five"><label>Región<select id="bRegion"></select></label><label>DM<select id="bDM"></select></label><label>Tienda<input id="bStore" list="bStoreList" placeholder="Buscar tienda"><datalist id="bStoreList"></datalist></label><label>Mes<select id="bMonth"></select></label><label>Buscar<input id="bSearch" placeholder="Partner o tienda"></label></div>
+  <div class="filters five"><label>Región<select id="bRegion"></select></label><label>DM<select id="bDM"></select></label><label>Tienda<select id="bStore"></select></label><label>Mes<select id="bMonth"></select></label><label>Buscar<input id="bSearch" placeholder="Partner o tienda"></label></div>
   <div class="toolbar"><strong id="bCount">0 cumpleaños</strong><button onclick="printPanel('birth')">Exportar PDF / Imprimir</button></div>
   <div id="bSlides" class="slides"></div>
 </section>
