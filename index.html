@@ -5,6 +5,14 @@
 <section id="partner" class="panel active">
   <div class="filters six"><label>Región<select id="pRegion"></select></label><label>DM<select id="pDM"></select></label><label>Tienda<select id="pStore"></select></label><label>Turno<select id="pShift"></select></label><label>Posición<select id="pRole"></select></label><label>Buscar<input id="pSearch" placeholder="Partner o # empleado"></label></div>
   <div class="grid"><aside class="card summary"><h2 id="storeTitle">Resumen Partner</h2><p id="storeMeta"></p><div class="kpis"><div><b id="kPartners">0</b><span>Partners</span></div><div><b id="kStores">0</b><span>Tiendas</span></div><div><b id="kDMs">0</b><span>DM</span></div><div><b id="kGerentes">0</b><span>Gerentes</span></div><div><b id="kSup">0</b><span>Supervisores</span></div><div><b id="kBar">0</b><span>Baristas</span></div></div><div class="donut" id="donut"><span id="donutPct">0%</span></div><div class="legend"><b id="womenPct">0% Mujeres</b><b id="menPct">0% Hombres</b></div><h3>Por posición</h3><div id="roleBars"></div><h3>Rango de edad</h3><div id="ageBars"></div></aside><section id="hierarchy" class="list"></section></div>
+  <section class="weekly-birthdays" aria-labelledby="weeklyBirthdaysTitle">
+    <div class="weekly-birthdays-head">
+      <div><span class="section-kicker">Conexión entre partners</span><h2 id="weeklyBirthdaysTitle">JUNTÉMONOS MÁS</h2><p id="weeklyBirthdaysRange"></p></div>
+      <span class="weekly-birthdays-icon" aria-hidden="true">🎂</span>
+    </div>
+    <p id="weeklyBirthdaysMessage" class="weekly-birthdays-message" aria-live="polite"></p>
+    <div id="weeklyBirthdaysList" class="weekly-birthdays-list"></div>
+  </section>
 </section>
 <section id="anniv" class="panel">
   <div class="filters five"><label>Región<select id="aRegion"></select></label><label>DM<select id="aDM"></select></label><label>Tienda<select id="aStore"></select></label><label>Mes<select id="aMonth"></select></label><label>Buscar<input id="aSearch" placeholder="Partner o tienda"></label></div>

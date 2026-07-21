@@ -103,8 +103,7 @@ function roleCounts(data){return Object.fromEntries(roleOrder.map(r=>[r,data.fil
 function barRows(counts){const max=Math.max(1,...Object.values(counts));return Object.entries(counts).filter(([k])=>k!=='Otros'||counts[k]>0).map(([r,c])=>`<div class="barRow"><b>${esc(r)}</b><span>${c}</span><div><i style="width:${c/max*100}%"></i></div></div>`).join('');}
 function ageCounts(data){const labels=['De 18 a 20 años','De 21 a 29 años','De 30 a 39 años','De 40 a 49 años','De 50 a 59 años','Mas de 60 años'];const counts=Object.fromEntries(labels.map(l=>[l,0]));data.forEach(x=>{const r=clean((x.rango||'').replace(/\.$/,''));const key=labels.find(l=>r.includes(clean(l)));if(key)counts[key]++;});return counts;}
 function renderPartner(){
-  cascade('p'); let data=filterBase('p'); const role=$('pRole').value,shift=$('pShift').value,search=clean($('pSearch').value);
-  data=data.filter(x=>(!role||same(x.puesto,role))&&(!shift||same(x.turno,shift))&&(!search||clean(`${x.nombre} ${x.num} ${x.tienda} ${x.puesto} ${x.turno}`).includes(search)));
+  cascade('p'); const data=filteredPartnerData();
   const stores=uniq(data.map(x=>x.tienda)),dms=uniq(data.map(x=>x.dm)),rc=roleCounts(data);
   $('kPartners').textContent=data.length;$('kStores').textContent=stores.length;$('kDMs').textContent=dms.length;$('kGerentes').textContent=rc.Gerente;$('kSup').textContent=rc.Supervisor;$('kBar').textContent=rc.Barista;
   $('storeTitle').textContent=$('pStore').value||'Resumen Partner';$('storeMeta').textContent=[$('pRegion').value||'Todas las regiones',$('pDM').value||'Todos los DM',$('pRole').value||'Todas las posiciones',$('pShift').value||'Todos los turnos'].join(' · ');
@@ -113,6 +112,30 @@ function renderPartner(){
   $('roleBars').innerHTML=barRows(rc);$('ageBars').innerHTML=barRows(ageCounts(data));const grouped={};
   data.sort((a,b)=>roleRank(a.puesto)-roleRank(b.puesto)||a.nombre.localeCompare(b.nombre,'es')).forEach(x=>(grouped[roleName(x.puesto)]??=[]).push(x));
   $('hierarchy').innerHTML=roleOrder.filter(r=>r!=='Otros'||(grouped[r]||[]).length).map(r=>{const arr=grouped[r]||[];return `<article class="role"><h2>${r==='Barista'?'Baristas':r}<span class="badge">${arr.length}</span></h2>${arr.map(personCard).join('')||'<small>Sin partners</small>'}</article>`;}).join('');
+}
+function filteredPartnerData(){
+  const role=$('pRole').value,shift=$('pShift').value,search=clean($('pSearch').value);
+  return filterBase('p').filter(x=>(!role||same(x.puesto,role))&&(!shift||same(x.turno,shift))&&(!search||clean(`${x.nombre} ${x.num} ${x.tienda} ${x.puesto} ${x.turno}`).includes(search)));
+}
+function mondayOfWeek(value){const d=new Date(value);d.setHours(0,0,0,0);d.setDate(d.getDate()-((d.getDay()+6)%7));return d;}
+function addCalendarDays(value,days){const d=new Date(value);d.setDate(d.getDate()+days);return d;}
+function birthdayInWeek(value,start,end){
+  const p=dateParts(value);if(!p)return null;
+  for(let year=start.getFullYear();year<=end.getFullYear();year++){
+    const occurrence=new Date(year,p.month-1,p.day);
+    if(occurrence.getMonth()!==p.month-1||occurrence.getDate()!==p.day)continue;
+    if(occurrence>=start&&occurrence<=end)return occurrence;
+  }
+  return null;
+}
+function shortLocalDate(value){return value.toLocaleDateString('es-MX',{weekday:'short',day:'numeric',month:'short'}).replace(/\./g,'');}
+function renderWeeklyBirthdays(referenceDate=new Date()){
+  const current=new Date(referenceDate);current.setHours(0,0,0,0);
+  const start=mondayOfWeek(current),end=addCalendarDays(start,6);
+  const birthdays=filteredPartnerData().map(partner=>({partner,date:birthdayInWeek(partner.nac,start,end)})).filter(item=>item.date).sort((a,b)=>a.date-b.date||a.partner.nombre.localeCompare(b.partner.nombre,'es'));
+  $('weeklyBirthdaysRange').textContent=`Semana del ${shortLocalDate(start)} al ${shortLocalDate(end)}`;
+  $('weeklyBirthdaysMessage').textContent=birthdays.length?'Celebremos y hagamos sentir especial a cada partner.':'Esta semana no hay cumpleaños en los filtros seleccionados.';
+  $('weeklyBirthdaysList').innerHTML=birthdays.map(({partner,date})=>`<article class="weekly-birthday-card"><div class="weekly-birthday-date"><b>${date.getDate()}</b><span>${date.toLocaleDateString('es-MX',{month:'short'}).replace(/\./g,'')}</span></div><div><h3>${esc(partner.nombre)}</h3><p>${esc(partner.tienda)}</p><span>${esc(partner.puesto)}</span></div>${date.getTime()===current.getTime()?'<strong class="today-badge">Hoy</strong>':''}</article>`).join('');
 }
 function personCard(x){return `<div class="person" onclick='showDetail(${JSON.stringify(x).replaceAll("'","&#39;")})'><div><b>${esc(x.nombre)}</b><small>${esc(x.num)} · ${esc(x.puesto)} · ${esc(x.tienda)}</small></div><span class="badge">${esc(x.turno)}</span></div>`;}
 function yearsAt(s){const p=dateParts(s);if(!p)return 0;let y=currentYear-p.year;const anniv=new Date(currentYear,p.month-1,p.day);if(today<anniv)y--;return Math.max(0,y);}
@@ -124,6 +147,6 @@ function summaryCards(data,type){const stores=uniq(data.map(x=>x.tienda)).length
 function celebrationCard(x,type){const p=dateParts(type==='a'?x.ingreso:x.nac),val=type==='a'?anniversaryYears(x.ingreso):birthdayAge(x.nac);return `<div class="celebration"><div class="day"><b>${String(p.day).padStart(2,'0')}</b><span>${monthShort(p.month)}</span></div><div class="who"><b title="${esc(x.nombre)}">${esc(x.nombre)}</b><small>${esc(x.puesto)}</small><small>${esc(x.tienda)}</small></div><div class="years"><b>${val} ${val==1?'año':'años'}</b><small>${type==='a'?'en la marca':'edad'}</small></div></div>`;}
 function renderCeleb(type){const pre=type==='a'?'a':'b',monthVal=$(pre+'Month').value,data=filteredCelebrations(type),totalPages=Math.max(1,Math.ceil(data.length/MAX_REGISTROS));$(pre+'Count').textContent=`${data.length} ${type==='a'?'aniversarios':'cumpleaños'} · ${totalPages} página${totalPages===1?'':'s'}`;const pages=data.length?chunk(data,MAX_REGISTROS):[[]],monthTitle=monthVal?months[+monthVal-1]:'Todo el año',title=type==='a'?'Celebramos tu Trayectoria':'Que tengas un día extraordinario',subtitle=type==='a'?'Gracias por crecer con nosotros':'Gracias por inspirarnos cada día';$(pre+'Slides').innerHTML=summaryCards(data,type).replace('summary-cards','capture-insights')+pages.map((arr,i)=>{const pageClass=layoutClass(arr.length),empty='<div class="celebration empty"><div class="who"><b>Sin registros para este filtro</b><small>Ajusta Región, DM, Tienda o Mes.</small></div></div>';return `<div class="slide ${type==='a'?'anniv':'birth'} ${pageClass}"><img class="templateImg" src="assets/${type==='a'?'anniversary':'birthday'}-template.png" alt="Plantilla"><h3>${esc(monthTitle)}</h3><div class="slideMessage"><b>${title}</b><span>${subtitle}</span></div><div class="celebrationList">${arr.map(x=>celebrationCard(x,type)).join('')||empty}</div><div class="miniSeal ${type==='a'?'annivSeal':'birthdaySeal'}"><span>${type==='a'?'🏆':'🎂'}</span><b>${type==='a'?'Celebramos tu Trayectoria':'Cumpleaños'}</b></div><div class="pageNumber">Página ${i+1} de ${totalPages}</div></div>`;}).join('');}
 function printPanel(id){document.body.dataset.printPanel=id;setTimeout(()=>window.print(),50);}
-function renderAll(){renderPartner();renderCeleb('a');renderCeleb('b');}
+function renderAll(){renderPartner();renderWeeklyBirthdays();renderCeleb('a');renderCeleb('b');}
 function showDetail(x){$('detailBody').innerHTML=`<h2>${esc(x.nombre)}</h2><p><b># Empleado:</b> ${esc(x.num)}</p><p><b>Puesto:</b> ${esc(x.puesto)}</p><p><b>Tienda:</b> ${esc(x.tienda)}</p><p><b>Centro de costos:</b> ${esc(x.cc)}</p><p><b>DM:</b> ${esc(x.dm)}</p><p><b>Región:</b> ${esc(x.region)}</p><p><b>Jornada:</b> ${esc(x.turno)}</p><p><b>Sexo:</b> ${x.sexo==='F'?'Femenino':x.sexo==='M'?'Masculino':esc(x.sexo)}</p><p><b>Edad:</b> ${esc(x.edad||ageAt(x.nac))} años · ${esc(x.rango||'')}</p><p><b>Ingreso:</b> ${esc(x.ingreso)} · ${yearsAt(x.ingreso)} años en la marca</p>`;$('detail').showModal();}
 init();
