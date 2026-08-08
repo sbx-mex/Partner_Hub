@@ -1,10 +1,41 @@
-<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#006241"><title>Partner Hub</title><link rel="manifest" href="manifest.webmanifest"><link rel="stylesheet" href="styles.css"><link rel="icon" href="assets/icon-192.png"></head><body>
-<header class="hero"><img src="assets/partner-hub-logo.png" alt="Partner Hub"><div><h1>PARTNER HUB</h1><p>Todo el talento en un solo lugar</p></div></header>
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#006241">
+  <title>Partner Hub</title>
+  <link rel="manifest" href="manifest.webmanifest?v=3.0.0">
+  <link rel="stylesheet" href="styles.css?v=3.0.0">
+  <link rel="icon" href="assets/icon-192.png">
+</head>
+<body>
+<a class="skip-link" href="#partner">Ir al contenido</a>
+<header class="hero">
+  <img src="assets/partner-hub-logo.png" alt="Partner Hub">
+  <div class="hero-copy"><h1>PARTNER HUB</h1><p>Todo el talento en un solo lugar</p></div>
+  <div class="data-status" aria-live="polite"><span></span><b id="dataStatus">Validando Query…</b></div>
+</header>
 <main class="wrap">
-<nav class="tabs"><button class="tab active" data-tab="partner">Partner</button><button class="tab" data-tab="anniv">Aniversarios</button><button class="tab" data-tab="birth">Cumpleaños</button></nav>
-<section id="partner" class="panel active">
-  <div class="filters six"><label>Región<select id="pRegion"></select></label><label>DM<select id="pDM"></select></label><label>Tienda<select id="pStore"></select></label><label>Turno<select id="pShift"></select></label><label>Posición<select id="pRole"></select></label><label>Buscar<input id="pSearch" placeholder="Partner o # empleado"></label></div>
-  <div class="grid"><aside class="card summary"><h2 id="storeTitle">Resumen Partner</h2><p id="storeMeta"></p><div class="kpis"><div><b id="kPartners">0</b><span>Partners</span></div><div><b id="kStores">0</b><span>Tiendas</span></div><div><b id="kDMs">0</b><span>DM</span></div><div><b id="kGerentes">0</b><span>Gerentes</span></div><div><b id="kSup">0</b><span>Supervisores</span></div><div><b id="kBar">0</b><span>Baristas</span></div></div><div class="donut" id="donut"><span id="donutPct">0%</span></div><div class="legend"><b id="womenPct">0% Mujeres</b><b id="menPct">0% Hombres</b></div><h3>Por posición</h3><div id="roleBars"></div><h3>Rango de edad</h3><div id="ageBars"></div></aside><section id="hierarchy" class="list"></section></div>
+<nav class="tabs" role="tablist" aria-label="Secciones de Partner Hub">
+  <button id="tab-partner" class="tab active" data-tab="partner" type="button" role="tab" aria-controls="partner" aria-selected="true">Partner</button>
+  <button id="tab-anniv" class="tab" data-tab="anniv" type="button" role="tab" aria-controls="anniv" aria-selected="false">Aniversarios</button>
+  <button id="tab-birth" class="tab" data-tab="birth" type="button" role="tab" aria-controls="birth" aria-selected="false">Cumpleaños</button>
+</nav>
+
+<section id="partner" class="panel active" role="tabpanel" aria-labelledby="tab-partner" tabindex="-1">
+  <div class="filters six">
+    <label>Región<select id="pRegion"></select></label><label>DM<select id="pDM"></select></label><label>Tienda<select id="pStore"></select></label><label>Turno<select id="pShift"></select></label><label>Posición<select id="pRole"></select></label><label>Buscar<input id="pSearch" placeholder="Partner o # empleado"></label>
+  </div>
+  <div class="grid">
+    <aside class="card summary">
+      <h2 id="storeTitle">Resumen Partner</h2><p id="storeMeta"></p>
+      <div class="kpis"><div><b id="kPartners">0</b><span>Partners</span></div><div><b id="kStores">0</b><span>Tiendas</span></div><div><b id="kDMs">0</b><span>DM</span></div><div><b id="kGerentes">0</b><span>Gerentes</span></div><div><b id="kSup">0</b><span>Supervisores</span></div><div><b id="kBar">0</b><span>Baristas</span></div></div>
+      <div class="donut" id="donut"><span id="donutPct">0%</span></div><div class="legend"><b id="womenPct">0% Mujeres</b><b id="menPct">0% Hombres</b></div>
+      <h3>Por posición</h3><div id="roleBars"></div><h3>Rango de edad</h3><div id="ageBars"></div>
+    </aside>
+    <section id="hierarchy" class="list"></section>
+  </div>
   <section class="weekly-birthdays" aria-labelledby="weeklyBirthdaysTitle">
     <div class="weekly-birthdays-head">
       <div><span class="section-kicker">Conexión entre partners</span><h2 id="weeklyBirthdaysTitle">JUNTÉMONOS MÁS</h2><p id="weeklyBirthdaysRange"></p></div>
@@ -14,17 +45,21 @@
     <div id="weeklyBirthdaysList" class="weekly-birthdays-list"></div>
   </section>
 </section>
-<section id="anniv" class="panel">
+
+<section id="anniv" class="panel" role="tabpanel" aria-labelledby="tab-anniv" tabindex="-1">
   <div class="filters five"><label>Región<select id="aRegion"></select></label><label>DM<select id="aDM"></select></label><label>Tienda<select id="aStore"></select></label><label>Mes<select id="aMonth"></select></label><label>Buscar<input id="aSearch" placeholder="Partner o tienda"></label></div>
-  <div class="toolbar"><strong id="aCount">0 aniversarios</strong><button onclick="printPanel('anniv')">Exportar PDF / Imprimir</button></div>
+  <div class="toolbar"><strong id="aCount">0 aniversarios</strong><button type="button" onclick="printPanel('anniv')">Exportar PDF / Imprimir</button></div>
   <div id="aSlides" class="slides"></div>
 </section>
-<section id="birth" class="panel">
+
+<section id="birth" class="panel" role="tabpanel" aria-labelledby="tab-birth" tabindex="-1">
   <div class="filters five"><label>Región<select id="bRegion"></select></label><label>DM<select id="bDM"></select></label><label>Tienda<select id="bStore"></select></label><label>Mes<select id="bMonth"></select></label><label>Buscar<input id="bSearch" placeholder="Partner o tienda"></label></div>
-  <div class="toolbar"><strong id="bCount">0 cumpleaños</strong><button onclick="printPanel('birth')">Exportar PDF / Imprimir</button></div>
+  <div class="toolbar"><strong id="bCount">0 cumpleaños</strong><button type="button" onclick="printPanel('birth')">Exportar PDF / Imprimir</button></div>
   <div id="bSlides" class="slides"></div>
 </section>
 </main>
-<footer style="box-sizing:border-box;width:100%;padding:16px 20px calc(16px + env(safe-area-inset-bottom));color:#5a6f65;font:600 12px/1.5 inherit;text-align:center;overflow-wrap:anywhere">Diseñado: Jorge Alcantar Aguiar &amp; Enrique César Flores</footer>
-<dialog id="detail"><button class="close" onclick="detail.close()">×</button><div id="detailBody"></div></dialog>
-<script src="data/partners.js"></script><script src="app.js"></script></body></html>
+<footer>Diseñado: Jorge Alcantar Aguiar &amp; Enrique César Flores</footer>
+<dialog id="detail"><button class="close" type="button" aria-label="Cerrar" onclick="detail.close()">×</button><div id="detailBody"></div></dialog>
+<script src="data/partners.js?v=3.0.0"></script><script src="app.js?v=3.0.0"></script>
+</body>
+</html>

@@ -1,9 +1,11 @@
 const H = (window.PARTNER_HEADERS || []).map(h => String(h ?? '').trim());
 const RAW_ROWS = window.PARTNER_ROWS || [];
+const META = window.PARTNER_META || {};
+const NAV = window.PARTNER_NAV || [];
 const normalizeValue = value => String(value ?? '').replace(/\s+/g, ' ').trim();
 const clean = value => normalizeValue(value).toLocaleLowerCase('es').normalize('NFD').replace(/[\u0300-\u036f]/g,'');
 const headerIndex = name => H.findIndex(h => normalizeValue(h) === name);
-const REQUIRED_HEADERS = ['TURNO','NOM_PUESTO'];
+const REQUIRED_HEADERS = ['NUM_EMP','NOMBRE','F_INGRESO','NOM_CCOSTO','TURNO','NOM_PUESTO','REGION','SEXO','F.NAC','DM','cc','EDAD','RANGO','STATUS','DIVISION','Estado','STATUS_ EMP (ACTIVO/BAJA)'];
 const missingHeaders = REQUIRED_HEADERS.filter(name => headerIndex(name) < 0);
 if(missingHeaders.length) throw new Error(`Encabezados no encontrados en Query.xlsx: ${missingHeaders.join(', ')}`);
 const valueAt = (row, name) => normalizeValue(row[headerIndex(name)]);
@@ -16,17 +18,29 @@ const R = RAW_ROWS.map(row => ({
 })).filter(x => x.nombre);
 
 const FILTER_IDS = ['pRegion','pDM','pStore','pRole','pShift','aRegion','aDM','aStore','aMonth','bRegion','bDM','bStore','bMonth'];
-const STORAGE_KEY = 'partnerHub.filters.v3';
+const STORAGE_KEY = 'partnerHub.filters.v4';
 const MAX_REGISTROS = 30;
 const months = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 const today = new Date(); today.setHours(0,0,0,0);
 const currentMonth = today.getMonth() + 1, currentYear = today.getFullYear();
+const dataMonth = Number(META.month) || currentMonth;
 const $ = id => document.getElementById(id);
 const same = (a,b) => clean(a) === clean(b);
 const uniq = values => {
   const map = new Map();
   values.map(normalizeValue).filter(Boolean).forEach(value => { const key=clean(value); if(!map.has(key)) map.set(key,value); });
   return [...map.values()].sort((a,b)=>a.localeCompare(b,'es',{sensitivity:'base'}));
+};
+const navRegions = () => NAV.length ? NAV.map(region=>region.name) : uniq(R.map(x=>x.region));
+const navDMs = region => {
+  if(!NAV.length)return uniq(R.filter(x=>!region||same(x.region,region)).map(x=>x.dm));
+  const regions=region?NAV.filter(item=>same(item.name,region)):NAV;
+  return uniq(regions.flatMap(item=>item.dms.map(dm=>dm.name)));
+};
+const navStores = (region,dm) => {
+  if(!NAV.length)return uniq(R.filter(x=>(!region||same(x.region,region))&&(!dm||same(x.dm,dm))).map(x=>x.tienda));
+  const regions=region?NAV.filter(item=>same(item.name,region)):NAV;
+  return uniq(regions.flatMap(item=>item.dms.filter(item=>!dm||same(item.name,dm)).flatMap(item=>item.stores)));
 };
 const roleOrder = ['Gerente','Subgerente','Supervisor','Barista','Otros'];
 const roleName = p => /sub/i.test(p) ? 'Subgerente' : /super/i.test(p) ? 'Supervisor' : /bar/i.test(p) ? 'Barista' : /gerente/i.test(p) ? 'Gerente' : 'Otros';
@@ -39,7 +53,7 @@ function fillSelect(el,items,all='Todos'){
   const match=values.find(x=>same(x,previous)); el.value=match||''; refreshSlicer(el);
 }
 function fillDatalist(){ }
-function monthOptions(el){ el.innerHTML=`<option value="">Todos</option>`+months.map((m,i)=>`<option value="${i+1}" ${i+1===currentMonth?'selected':''}>${m}</option>`).join(''); }
+function monthOptions(el){ el.innerHTML=`<option value="">Todos</option>`+months.map((m,i)=>`<option value="${i+1}" ${i+1===dataMonth?'selected':''}>${m}</option>`).join(''); }
 function enhanceSelect(select){
   if(!select||select.dataset.enhanced)return; select.dataset.enhanced='true'; select.classList.add('native-slicer');
   const shell=document.createElement('div'); shell.className='slicer';
@@ -70,14 +84,45 @@ document.addEventListener('click',()=>document.querySelectorAll('.slicer.open').
 function layoutClass(count){return count<=8?'premium':count<=16?'sixteen':count<=24?'medium':'compact';}
 function chunk(arr,size){return Array.from({length:Math.ceil(arr.length/size)},(_,i)=>arr.slice(i*size,i*size+size));}
 function monthShort(n){return months[n-1].slice(0,3).toUpperCase();}
+let activePanel = 'partner';
+let renderTimer = 0;
+function activateTab(panelId,{focus=false,updateHash=true}={}){
+  if(!['partner','anniv','birth'].includes(panelId))panelId='partner';
+  activePanel=panelId;
+  document.querySelectorAll('.tab').forEach(button=>{
+    const selected=button.dataset.tab===panelId;
+    button.classList.toggle('active',selected);button.setAttribute('aria-selected',String(selected));button.tabIndex=selected?0:-1;
+  });
+  document.querySelectorAll('.panel').forEach(panel=>panel.classList.toggle('active',panel.id===panelId));
+  if(updateHash)history.replaceState(null,'',`#${panelId}`);
+  renderActive();
+  if(focus)$(panelId)?.focus({preventScroll:true});
+}
+function renderActive(){
+  if(activePanel==='partner'){renderPartner();renderWeeklyBirthdays();}
+  else if(activePanel==='anniv')renderCeleb('a');
+  else renderCeleb('b');
+}
+function scheduleRender(id){
+  clearTimeout(renderTimer);
+  const isSearch=['pSearch','aSearch','bSearch'].includes(id);
+  if(isSearch)renderTimer=setTimeout(renderActive,120);else renderActive();
+}
 function init(){
-  document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{document.querySelectorAll('.tab,.panel').forEach(x=>x.classList.remove('active'));b.classList.add('active');$(b.dataset.tab).classList.add('active');});
-  ['pRegion','aRegion','bRegion'].forEach(id=>fillSelect($(id),R.map(x=>x.region),'Todos'));
+  const status=$('dataStatus');if(status)status.textContent=META.periodEnd?`Datos al ${new Date(META.periodEnd+'T00:00:00').toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'numeric'}).replace(/\./g,'')}`:'Datos no disponibles';
+  const tabs=[...document.querySelectorAll('.tab')];
+  tabs.forEach((button,index)=>{
+    button.onclick=()=>activateTab(button.dataset.tab,{focus:true});
+    button.onkeydown=event=>{let target=index;if(event.key==='ArrowRight')target=(index+1)%tabs.length;else if(event.key==='ArrowLeft')target=(index-1+tabs.length)%tabs.length;else if(event.key==='Home')target=0;else if(event.key==='End')target=tabs.length-1;else return;event.preventDefault();tabs[target].focus();activateTab(tabs[target].dataset.tab);};
+  });
+  ['pRegion','aRegion','bRegion'].forEach(id=>fillSelect($(id),navRegions(),'Todos'));
   ['aMonth','bMonth'].forEach(id=>monthOptions($(id)));
   fillSelect($('pRole'),R.map(x=>x.puesto),'Todos'); fillSelect($('pShift'),R.map(x=>x.turno),'Todos');
   FILTER_IDS.forEach(id=>enhanceSelect($(id))); restoreFilters();
-  ['pRegion','pDM','pStore','pRole','pShift','pSearch','aRegion','aDM','aStore','aMonth','aSearch','bRegion','bDM','bStore','bMonth','bSearch'].forEach(id=>$(id)?.addEventListener('input',()=>{persistFilters();renderAll();}));
-  renderAll(); if('serviceWorker'in navigator)navigator.serviceWorker.register('sw.js?v=turno-posicion-v3');
+  ['pRegion','pDM','pStore','pRole','pShift','pSearch','aRegion','aDM','aStore','aMonth','aSearch','bRegion','bDM','bStore','bMonth','bSearch'].forEach(id=>$(id)?.addEventListener('input',()=>{persistFilters();scheduleRender(id);}));
+  const initial=location.hash.slice(1);activateTab(['partner','anniv','birth'].includes(initial)?initial:'partner',{updateHash:false});
+  window.addEventListener('hashchange',()=>activateTab(location.hash.slice(1),{updateHash:false}));
+  if('serviceWorker'in navigator)navigator.serviceWorker.register('sw.js?v=partner-hub-v5');
 }
 function geographicBase(prefix){
   const region=$(prefix+'Region')?.value||'',dm=$(prefix+'DM')?.value||'',store=$(prefix+'Store')?.value||'';
@@ -85,9 +130,9 @@ function geographicBase(prefix){
 }
 function cascade(prefix){
   const region=$(prefix+'Region')?.value||'',oldDM=$(prefix+'DM')?.value||'',storeEl=$(prefix+'Store'),oldStore=storeEl?.value||'';
-  let list=R.filter(x=>!region||same(x.region,region)); const dms=uniq(list.map(x=>x.dm)); fillSelect($(prefix+'DM'),dms,'Todos');
+  const dms=navDMs(region); fillSelect($(prefix+'DM'),dms,'Todos');
   const dmMatch=dms.find(x=>same(x,oldDM)); if(dmMatch)$(prefix+'DM').value=dmMatch;
-  list=list.filter(x=>!$(prefix+'DM')?.value||same(x.dm,$(prefix+'DM').value)); const stores=uniq(list.map(x=>x.tienda)); fillSelect(storeEl,stores,'Todos');
+  const stores=navStores(region,$(prefix+'DM')?.value||''); fillSelect(storeEl,stores,'Todos');
   const storeMatch=stores.find(x=>same(x,oldStore)); if(storeEl)storeEl.value=storeMatch||''; refreshSlicer(storeEl);
   if(prefix==='p'){
     const roleEl=$('pRole'),shiftEl=$('pShift'),oldRole=roleEl?.value||'',oldShift=shiftEl?.value||'',geo=geographicBase('p');
