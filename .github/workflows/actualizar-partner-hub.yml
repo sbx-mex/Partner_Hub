@@ -1,0 +1,72 @@
+name: Actualizar y publicar Partner Hub
+
+on:
+  workflow_dispatch:
+    inputs:
+      expected_month:
+        description: "Mes numérico esperado; vacío = detectar automáticamente"
+        required: false
+        type: string
+  push:
+    branches: [main]
+    paths:
+      - "data/Query.xlsx"
+      - "engine/**"
+      - "tests/**"
+      - "*.js"
+      - "*.html"
+      - "*.css"
+      - "requirements.txt"
+      - ".github/workflows/actualizar-partner-hub.yml"
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: partner-hub-pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Instalar motor
+        run: pip install -r requirements.txt
+      - name: Probar motor
+        run: python -m unittest discover -s tests -v
+      - name: Generar datos desde Query
+        env:
+          EXPECTED_MONTH: ${{ inputs.expected_month }}
+        run: |
+          args=(--excel data/Query.xlsx --output data/partners.js --audit build/auditoria_query.json --baseline data/partners.js)
+          if [[ -n "$EXPECTED_MONTH" ]]; then args+=(--expected-month "$EXPECTED_MONTH"); fi
+          python -m engine.partner_engine "${args[@]}"
+      - name: Preparar sitio
+        run: python engine/package_site.py --source . --output build/site
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: build/site
+      - uses: actions/upload-artifact@v4
+        with:
+          name: auditoria-partner-hub
+          path: build/auditoria_query.json
+
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Publicar GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+
