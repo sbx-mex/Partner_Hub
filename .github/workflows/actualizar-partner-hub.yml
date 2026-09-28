@@ -11,6 +11,7 @@ on:
     branches: [main]
     paths:
       - "data/Query.xlsx"
+      - "data/Directorio.xlsx"
       - "engine/**"
       - "tests/**"
       - "*.js"
@@ -45,7 +46,7 @@ jobs:
         env:
           EXPECTED_MONTH: ${{ inputs.expected_month }}
         run: |
-          args=(--excel data/Query.xlsx --output data/partners.js --audit build/auditoria_query.json --baseline data/partners.js)
+          args=(--excel data/Query.xlsx --directory data/Directorio.xlsx --output data/partners.js --audit build/auditoria_query.json --baseline data/partners.js)
           if [[ -n "$EXPECTED_MONTH" ]]; then args+=(--expected-month "$EXPECTED_MONTH"); fi
           python -m engine.partner_engine "${args[@]}"
       - name: Preparar sitio
@@ -69,4 +70,3 @@ jobs:
       - name: Publicar GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
-
