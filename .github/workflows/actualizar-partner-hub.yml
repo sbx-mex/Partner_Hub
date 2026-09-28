@@ -14,6 +14,7 @@ on:
       - "data/Directorio.xlsx"
       - "engine/**"
       - "tests/**"
+      - "tools/**"
       - "*.js"
       - "*.html"
       - "*.css"
@@ -42,6 +43,8 @@ jobs:
         run: pip install -r requirements.txt
       - name: Probar motor
         run: python -m unittest discover -s tests -v
+      - name: Auditar corte y cruces
+        run: python -m tools.audit_sources --output build/validacion_corte.json
       - name: Generar datos desde Query
         env:
           EXPECTED_MONTH: ${{ inputs.expected_month }}
@@ -56,9 +59,12 @@ jobs:
         with:
           path: build/site
       - uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: auditoria-partner-hub
-          path: build/auditoria_query.json
+          path: |
+            build/validacion_corte.json
+            build/auditoria_query.json
 
   deploy:
     environment:
