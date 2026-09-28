@@ -5,13 +5,14 @@ import argparse
 import json
 import re
 from collections import Counter, defaultdict
+from datetime import date
 from pathlib import Path
 
 from openpyxl import load_workbook
 
 from engine.partner_engine.generator import (
-    EXPECTED_HEADERS, _digest, ceco_from_ccosto, cell, column_positions,
-    find_header_row, iso_date, load_directory, query_cutoff, sort_key,
+    EXPECTED_HEADERS, _digest, ceco_from_ccosto, cell, clean_text, column_positions,
+    employee_id, find_header_row, iso_date, load_directory, query_cutoff, sort_key,
 )
 
 
@@ -37,7 +38,11 @@ def audit_sources(query: Path, directory: Path) -> dict:
             if not any(value is not None for value in row):
                 continue
             totals["sourceRows"] += 1
-            termination = iso_date(cell(row, columns, "F_BAJA"))
+            try:
+                termination = iso_date(cell(row, columns, "F_BAJA"))
+            except ValueError:
+                totals["invalidRowsExcluded"] += 1
+                continue
             if termination and termination <= cutoff.isoformat():
                 totals["terminatedAtCutoff"] += 1
                 continue
@@ -63,9 +68,20 @@ def audit_sources(query: Path, directory: Path) -> dict:
                 if others:
                     ambiguous[(ceco, ",".join(sorted(others)))] += 1
                     continue
+            try:
+                hire = iso_date(cell(row, columns, "F_INGRESO"))
+                birth = iso_date(cell(row, columns, "F.NAC"))
+            except ValueError:
+                totals["invalidRowsExcluded"] += 1
+                continue
+            if (not employee_id(cell(row, columns, "NUM_EMP")) or not clean_text(cell(row, columns, "NOMBRE"))
+                or not hire or not birth or date.fromisoformat(hire) > cutoff or date.fromisoformat(birth) > cutoff
+                or not clean_text(cell(row, columns, "TURNO")) or not clean_text(cell(row, columns, "NOM_PUESTO"))):
+                totals["invalidRowsExcluded"] += 1
+                continue
             totals["matchedOpenRows"] += 1
             matched_cecos.add(ceco)
-        unresolved = sum(missing.values()) + sum(not_open.values()) + sum(ambiguous.values()) + totals["invalidCCOSTO"] + totals["conflictingDirectoryRows"]
+        excluded = sum(missing.values()) + sum(not_open.values()) + sum(ambiguous.values()) + totals["invalidCCOSTO"] + totals["conflictingDirectoryRows"] + totals["invalidRowsExcluded"]
         published = query.parent / "partners.js"
         published_matches = False
         if published.is_file():
@@ -77,11 +93,11 @@ def audit_sources(query: Path, directory: Path) -> dict:
                                      and meta.get("periodEnd") == cutoff.isoformat())
         return {
             "cutoffM1": cutoff.isoformat(), "sourceSha256": _digest(query),
-            "directorySha256": _digest(directory), "canPublish": unresolved == 0,
+            "directorySha256": _digest(directory), "canPublish": totals["matchedOpenRows"] > 0,
             "publishedSnapshotMatchesSources": published_matches,
             "counts": dict(totals), "matchedOpenStores": len(matched_cecos),
             "queryNameDiffersFromDirectoryRows": sum(mismatched_names.values()),
-            "unresolvedRows": unresolved, "directory": directory_audit,
+            "excludedByJoin": excluded, "directory": directory_audit,
             "missingCeCos": [{"ceco": c, "rows": n} for c, n in sorted(missing.items())],
             "nonOpenCeCos": [{"ceco": c, "status": s, "rows": n} for (c, s), n in sorted(not_open.items())],
             "ambiguousNameCeCos": [{"queryCeCo": c, "nameMatchesCeCos": other.split(","), "rows": n}
@@ -102,7 +118,7 @@ def main() -> int:
     report = audit_sources(args.query, args.directory)
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(report, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
-    print(json.dumps({"canPublish": report["canPublish"], "unresolvedRows": report["unresolvedRows"],
+    print(json.dumps({"canPublish": report["canPublish"], "excludedByJoin": report["excludedByJoin"],
                       "output": str(args.output)}, ensure_ascii=False))
     return 0 if report["canPublish"] else 1
 

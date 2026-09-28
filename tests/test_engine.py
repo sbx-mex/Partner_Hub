@@ -109,19 +109,42 @@ class WorkbookIntegrationTests(unittest.TestCase):
         self.output.write_text("anterior", encoding="utf-8")
         self.audit.write_text("anterior", encoding="utf-8")
         self.query_rows[0]["CCOSTO"] = 1538657
-        with self.assertRaisesRegex(ValueError, "no existe"):
+        with self.assertRaisesRegex(ValueError, "no contiene partners activos válidos"):
             self.build()
         self.assertEqual(self.output.read_text(encoding="utf-8"), "anterior")
         self.assertEqual(self.audit.read_text(encoding="utf-8"), "anterior")
 
-    def test_closed_or_conflicting_directory_rejected(self):
-        self.directory_rows[0]["Estatus"] = "Cerrada"
-        with self.assertRaisesRegex(ValueError, "no está abierto"):
-            self.build()
-        self.directory_rows[0]["Estatus"] = "Abierta"
+    def test_only_open_stores_publish_and_rejected_joins_are_counted(self):
+        self.directory_rows.extend([
+            {"CC": 38362, "CC Nombre": "Cierre", "Región": "Noroeste", "Estatus": "Cierre Temporal", "DM": "Otro DM"},
+            {"CC": 38363, "CC Nombre": "Próxima", "Región": "Norte", "Estatus": "Próxima Apertura", "DM": "Otra DM"},
+        ])
+        self.query_rows.extend([
+            {**self.query_rows[0], "NUM_EMP": 124, "CCOSTO": "01938362"},
+            {**self.query_rows[0], "NUM_EMP": 125, "CCOSTO": "01938363"},
+            {**self.query_rows[0], "NUM_EMP": 126, "CCOSTO": "01938364"},
+        ])
+        self.build()
+        audit = json.loads(self.audit.read_text(encoding="utf-8"))
+        self.assertEqual(audit["publishedRows"], 1)
+        self.assertEqual(audit["skippedByReason"], {"missingCeCo": 1, "notOpen": 2})
+        self.assertEqual(audit["excludedRows"], 3)
+        self.assertTrue(audit["validated"])
+        data = self.output.read_text(encoding="utf-8")
+        self.assertIn('"Centro Norte"', data)
+        self.assertIn('"Diana"', data)
+        self.assertNotIn("Otro DM", data)
+        self.assertNotIn("Otra DM", data)
+
+    def test_conflicting_directory_ceco_is_excluded_without_stopping(self):
         self.directory_rows.append({**self.directory_rows[0], "DM": "Otra DM"})
-        with self.assertRaisesRegex(ValueError, "contradictorio"):
-            self.build()
+        self.directory_rows.append({"CC": 38657, "CC Nombre": "Segunda tienda", "Región": "Sur",
+                                    "Estatus": "Abierta", "DM": "DM Sur"})
+        self.query_rows.append({**self.query_rows[0], "NUM_EMP": 124, "CCOSTO": 1538657})
+        self.build()
+        audit = json.loads(self.audit.read_text(encoding="utf-8"))
+        self.assertEqual(audit["skippedByReason"], {"conflictingDirectory": 1})
+        self.assertEqual(audit["publishedRows"], 1)
 
     def test_directory_numeric_ceco_with_lost_leading_zero(self):
         self.directory_rows[0]["CC"] = 42
@@ -148,24 +171,46 @@ class WorkbookIntegrationTests(unittest.TestCase):
             build_partner_data(self.query, self.output, self.audit, directory_path=self.directory,
                                as_of=date(2026, 9, 29))
 
-    def test_name_matching_another_ceco_blocks_wrong_dm(self):
+    def test_name_matching_another_ceco_is_excluded(self):
         self.directory_rows.append({"CC": 38362, "CC Nombre": "Nombre anterior", "Región": "Otra",
                                     "Estatus": "Abierta", "DM": "Otro DM"})
-        with self.assertRaisesRegex(ValueError, "CeCos distintos"):
-            self.build()
+        self.query_rows[0]["NOM_CCOSTO"] = "Tienda Centro"
+        self.query_rows.append({**self.query_rows[0], "NUM_EMP": 124,
+                                "NOM_CCOSTO": "Nombre anterior"})
+        self.build()
+        audit = json.loads(self.audit.read_text(encoding="utf-8"))
+        self.assertEqual(audit["skippedByReason"], {"ambiguousStoreName": 1})
+        self.assertEqual(audit["publishedRows"], 1)
 
     def test_future_termination_remains_active_at_cutoff(self):
         self.query_rows[0]["F_BAJA"] = date(2026, 10, 1)
         result = self.build()
         self.assertEqual(result.published_rows, 1)
 
+    def test_conflicting_employee_rows_remove_both_variants(self):
+        self.query_rows.append({**self.query_rows[0], "NOMBRE": "Otra identidad"})
+        self.query_rows.append({**self.query_rows[0], "NUM_EMP": 124})
+        self.build()
+        audit = json.loads(self.audit.read_text(encoding="utf-8"))
+        self.assertEqual(audit["publishedRows"], 1)
+        self.assertEqual(audit["skippedByReason"], {"conflictingEmployee": 2})
+        self.assertNotIn("Otra identidad", self.output.read_text(encoding="utf-8"))
+
+    def test_invalid_partner_row_is_skipped_when_another_is_valid(self):
+        self.query_rows.append({**self.query_rows[0], "NUM_EMP": 124, "F_INGRESO": date(2026, 10, 1)})
+        self.build()
+        audit = json.loads(self.audit.read_text(encoding="utf-8"))
+        self.assertEqual(audit["publishedRows"], 1)
+        self.assertEqual(audit["skippedByReason"], {"invalidRow": 1})
+
     def test_preflight_reports_missing_ceco_without_employee_details(self):
         self.query_rows.append({**self.query_rows[0], "CCOSTO": "01938362", "NUM_EMP": 555,
                                 "NOMBRE": "Persona privada"})
         self.save()
         report = audit_sources(self.query, self.directory)
-        self.assertFalse(report["canPublish"])
+        self.assertTrue(report["canPublish"])
         self.assertEqual(report["missingCeCos"], [{"ceco": "38362", "rows": 1}])
+        self.assertEqual(report["excludedByJoin"], 1)
         self.assertNotIn("Persona privada", json.dumps(report, ensure_ascii=False))
 
     def test_output_cannot_replace_source_book(self):

@@ -181,25 +181,29 @@ def load_directory(path: str | Path) -> tuple[dict[str, dict[str, str]], set[str
         sheet = workbook["Directorio"] if "Directorio" in workbook.sheetnames else workbook.active
         first, headers = find_header_row(sheet, DIRECTORY_HEADERS)
         columns = column_positions(headers)
-        stores, conflicts, duplicates = {}, set(), 0
+        stores, conflicts, duplicates, invalid_rows = {}, set(), 0, 0
         for row in sheet.iter_rows(min_row=first + 1, values_only=True):
             if not any(value is not None for value in row):
                 continue
             ceco = directory_ceco(cell(row, columns, "CC"))
             if not ceco:
-                raise ValueError("El Directorio contiene un CeCo inválido")
+                invalid_rows += 1
+                continue
             record = {key: clean_text(cell(row, columns, source)) for key, source in
                       (("store", "CC Nombre"), ("region", "Región"), ("status", "Estatus"), ("dm", "DM"))}
             if not all(record.values()):
-                raise ValueError(f"Datos de tienda incompletos en Directorio: {ceco}")
+                invalid_rows += 1
+                conflicts.add(ceco)
+                continue
             if ceco in stores:
                 duplicates += 1
                 if any(sort_key(stores[ceco][key]) != sort_key(record[key]) for key in record):
                     conflicts.add(ceco)
             else:
                 stores[ceco] = record
-        return stores, conflicts, {"rows": len(stores) + duplicates, "duplicateCeCos": duplicates,
-                                   "conflictingCeCosNotUsed": len(conflicts)}
+        return stores, conflicts, {"rows": len(stores) + duplicates + invalid_rows,
+                                   "duplicateCeCos": duplicates, "invalidRowsExcluded": invalid_rows,
+                                   "conflictingCeCosExcluded": len(conflicts)}
     finally:
         workbook.close()
 
@@ -235,13 +239,18 @@ def build_partner_data(
         for code, store in stores.items():
             name_to_cecos[sort_key(store["store"])].add(code)
         source_rows = terminated = name_mismatches = identical_rows = 0
-        published: list[list[Any]] = []
-        seen: dict[str, tuple[Any, ...]] = {}
-        for row_number, row in enumerate(sheet.iter_rows(min_row=first + 1, values_only=True), first + 1):
+        skipped: dict[str, int] = defaultdict(int)
+        candidates: dict[str, tuple[Any, ...]] = {}
+        invalid_employees: set[str] = set()
+        for row in sheet.iter_rows(min_row=first + 1, values_only=True):
             if not any(value is not None for value in row):
                 continue
             source_rows += 1
-            termination = iso_date(cell(row, columns, "F_BAJA"))
+            try:
+                termination = iso_date(cell(row, columns, "F_BAJA"))
+            except ValueError:
+                skipped["invalidRow"] += 1
+                continue
             if termination and date.fromisoformat(termination) <= cutoff:
                 terminated += 1
                 continue
@@ -249,34 +258,51 @@ def build_partner_data(
             name = clean_text(cell(row, columns, "NOMBRE"))
             ceco = ceco_from_ccosto(cell(row, columns, "CCOSTO"))
             if not number or not name or not ceco:
-                raise ValueError(f"Fila Query {row_number}: empleado, nombre o CCOSTO inválido")
+                skipped["invalidRow"] += 1
+                continue
             if ceco in conflicts:
-                raise ValueError(f"Directorio contradictorio para CeCo {ceco}")
+                skipped["conflictingDirectory"] += 1
+                continue
             if ceco not in stores:
-                raise ValueError(f"CeCo {ceco} de Query no existe en Directorio")
+                skipped["missingCeCo"] += 1
+                continue
             store = stores[ceco]
             if sort_key(store["status"]) != "abierta":
-                raise ValueError(f"CeCo {ceco} no está abierto en Directorio ({store['status']})")
+                skipped["notOpen"] += 1
+                continue
             query_name = sort_key(cell(row, columns, "NOM_CCOSTO")) if header_key("NOM_CCOSTO") in columns else ""
             other_cecos = name_to_cecos.get(query_name, set()) - {ceco}
             if query_name and query_name != sort_key(store["store"]) and other_cecos:
-                raise ValueError(f"Query fila {row_number}: CCOSTO {ceco} y NOM_CCOSTO apuntan a CeCos distintos ({', '.join(sorted(other_cecos))})")
-            hire, birth = iso_date(cell(row, columns, "F_INGRESO")), iso_date(cell(row, columns, "F.NAC"))
+                skipped["ambiguousStoreName"] += 1
+                continue
+            try:
+                hire, birth = iso_date(cell(row, columns, "F_INGRESO")), iso_date(cell(row, columns, "F.NAC"))
+            except ValueError:
+                skipped["invalidRow"] += 1
+                continue
             if not hire or not birth or date.fromisoformat(hire) > cutoff or date.fromisoformat(birth) > cutoff:
-                raise ValueError(f"Fechas inválidas o posteriores al corte en Query, fila {row_number}")
+                skipped["invalidRow"] += 1
+                continue
             shift, role = clean_text(cell(row, columns, "TURNO")), clean_text(cell(row, columns, "NOM_PUESTO"))
             if not shift or not role:
-                raise ValueError(f"Turno o puesto vacío en Query, fila {row_number}")
+                skipped["invalidRow"] += 1
+                continue
             if header_key("NOM_CCOSTO") in columns and sort_key(cell(row, columns, "NOM_CCOSTO")) != sort_key(store["store"]):
                 name_mismatches += 1
             values = (name, hire, ceco, store["store"], shift, role, store["region"], store["dm"], f"--{birth[5:]}")
-            if number in seen:
-                if seen[number] != values:
-                    raise ValueError(f"Empleado duplicado con datos contradictorios en Query, fila {row_number}")
+            if number in invalid_employees:
+                skipped["conflictingEmployee"] += 1
+                continue
+            if number in candidates:
+                if candidates[number] != values:
+                    candidates.pop(number)
+                    invalid_employees.add(number)
+                    skipped["conflictingEmployee"] += 2
+                    continue
                 identical_rows += 1
                 continue
-            seen[number] = values
-            published.append(list(values))
+            candidates[number] = values
+        published = [list(values) for values in candidates.values()]
         if not source_rows or not published:
             raise ValueError("Query no contiene partners activos válidos")
     finally:
@@ -290,6 +316,7 @@ def build_partner_data(
         "periodEnd": cutoff.isoformat(),
         "month": cutoff.month, "monthName": MONTHS[cutoff.month - 1], "year": cutoff.year,
         "sourceRows": source_rows, "publishedRows": len(published),
+        "validated": True, "excludedRows": source_rows - len(published),
         "stores": len(unique_stores), "regions": len(navigation),
         "sourceSha256": _digest(excel), "directorySha256": _digest(directory),
     }
@@ -297,6 +324,7 @@ def build_partner_data(
         "status": "ok", **meta, "headerRow": first, "columnsRead": list(EXPECTED_HEADERS),
         "columnsPublished": list(RUNTIME_HEADERS), "terminatedExcluded": terminated,
         "identicalEmployeeRowsRemoved": identical_rows, "queryStoreNameDifferences": name_mismatches,
+        "skippedByReason": dict(sorted(skipped.items())),
         "directoryAudit": directory_audit,
         "uniqueRegions": len(navigation), "uniqueDM": len(unique_dms), "uniqueStores": len(unique_stores),
         "baselinePublishedRows": _baseline_count(baseline_path),
