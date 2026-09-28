@@ -10,9 +10,9 @@ if __name__ == "__main__":
         "--excel": "data/Query.xlsx",
         "--output": "data/partners.js",
         "--audit": "build/auditoria_query.json",
+        "--directory": "data/Directorio.xlsx",
     }
     for option, value in defaults.items():
         if option not in sys.argv:
             sys.argv.extend([option, value])
     raise SystemExit(main())
-

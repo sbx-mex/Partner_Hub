@@ -130,3 +130,9 @@
 .panel:focus{outline:none}footer{box-sizing:border-box;width:100%;padding:16px 20px calc(16px + env(safe-area-inset-bottom));color:#5a6f65;font-size:12px;font-weight:700;line-height:1.5;text-align:center;overflow-wrap:anywhere}
 @media(max-width:700px){.hero{gap:12px;padding:16px}.hero img{width:60px}.hero h1{font-size:22px}.hero p{font-size:12px}.data-status{padding:7px 9px}.tabs{margin:8px;gap:6px}.tab{padding:11px 7px;font-size:12px}}
 @media(max-width:470px){.data-status{width:10px;height:10px;padding:0;border:0;background:transparent}.data-status span{width:10px;height:10px}.data-status b{position:absolute;clip:rect(0 0 0 0);clip-path:inset(50%);width:1px;height:1px;overflow:hidden}}
+
+/* Consulta de directorio: alcance legible y tarjetas accesibles. */
+.data-scope{display:block;margin-top:5px;color:#755523;font-size:12px;font-weight:650;line-height:1.4}
+.person{width:100%;border:0;border-bottom:1px solid #e4f0ea;background:transparent;text-align:left;font:inherit;color:inherit;cursor:pointer}
+.person:hover,.person:focus-visible{background:#f1f8f4}
+.person:focus-visible{outline:3px solid #006241;outline-offset:2px}

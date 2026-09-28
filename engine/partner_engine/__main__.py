@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+from datetime import date
 
 from .generator import build_partner_data
 
@@ -13,6 +14,8 @@ def main() -> int:
     parser.add_argument("--output", default="data/partners.js")
     parser.add_argument("--audit", default="build/auditoria_query.json")
     parser.add_argument("--sheet", default="Query")
+    parser.add_argument("--directory", default="data/Directorio.xlsx")
+    parser.add_argument("--as-of", type=date.fromisoformat, help="Fecha de carga YYYY-MM-DD")
     parser.add_argument("--expected-month", type=int)
     parser.add_argument("--expected-year", type=int)
     parser.add_argument("--baseline")
@@ -20,6 +23,7 @@ def main() -> int:
     try:
         result = build_partner_data(
             args.excel, args.output, args.audit, sheet_name=args.sheet,
+            directory_path=args.directory, as_of=args.as_of,
             expected_month=args.expected_month, expected_year=args.expected_year, baseline_path=args.baseline,
         )
     except Exception as error:
@@ -36,4 +40,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     sys.exit(main())
-

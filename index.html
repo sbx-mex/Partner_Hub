@@ -5,16 +5,16 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#006241">
   <title>Partner Hub</title>
-  <link rel="manifest" href="manifest.webmanifest?v=3.0.0">
-  <link rel="stylesheet" href="styles.css?v=3.0.0">
+  <link rel="manifest" href="manifest.webmanifest?v=3.1.0">
+  <link rel="stylesheet" href="styles.css?v=3.1.0">
   <link rel="icon" href="assets/icon-192.png">
 </head>
 <body>
 <a class="skip-link" href="#partner">Ir al contenido</a>
 <header class="hero">
   <img src="assets/partner-hub-logo.png" alt="Partner Hub">
-  <div class="hero-copy"><h1>PARTNER HUB</h1><p>Todo el talento en un solo lugar</p></div>
-  <div class="data-status" aria-live="polite"><span></span><b id="dataStatus">Validando Query…</b></div>
+  <div class="hero-copy"><h1>PARTNER HUB</h1><p>Encuentra a tu equipo, conecta con cada tienda</p><small id="dataScope" class="data-scope">Validando directorio…</small></div>
+  <div class="data-status" aria-live="polite"><span></span><b id="dataStatus">Validando datos…</b></div>
 </header>
 <main class="wrap">
 <nav class="tabs" role="tablist" aria-label="Secciones de Partner Hub">
@@ -25,14 +25,13 @@
 
 <section id="partner" class="panel active" role="tabpanel" aria-labelledby="tab-partner" tabindex="-1">
   <div class="filters six">
-    <label>Región<select id="pRegion"></select></label><label>DM<select id="pDM"></select></label><label>Tienda<select id="pStore"></select></label><label>Turno<select id="pShift"></select></label><label>Posición<select id="pRole"></select></label><label>Buscar<input id="pSearch" placeholder="Partner o # empleado"></label>
+    <label>Región<select id="pRegion"></select></label><label>DM<select id="pDM"></select></label><label>Tienda<select id="pStore"></select></label><label>Turno<select id="pShift"></select></label><label>Posición<select id="pRole"></select></label><label>Buscar<input id="pSearch" placeholder="Nombre, tienda o CeCo"></label>
   </div>
   <div class="grid">
     <aside class="card summary">
       <h2 id="storeTitle">Resumen Partner</h2><p id="storeMeta"></p>
       <div class="kpis"><div><b id="kPartners">0</b><span>Partners</span></div><div><b id="kStores">0</b><span>Tiendas</span></div><div><b id="kDMs">0</b><span>DM</span></div><div><b id="kGerentes">0</b><span>Gerentes</span></div><div><b id="kSup">0</b><span>Supervisores</span></div><div><b id="kBar">0</b><span>Baristas</span></div></div>
-      <div class="donut" id="donut"><span id="donutPct">0%</span></div><div class="legend"><b id="womenPct">0% Mujeres</b><b id="menPct">0% Hombres</b></div>
-      <h3>Por posición</h3><div id="roleBars"></div><h3>Rango de edad</h3><div id="ageBars"></div>
+      <h3>Por posición</h3><div id="roleBars"></div>
     </aside>
     <section id="hierarchy" class="list"></section>
   </div>
@@ -60,6 +59,6 @@
 </main>
 <footer>Diseñado: Jorge Alcantar Aguiar &amp; Enrique César Flores</footer>
 <dialog id="detail"><button class="close" type="button" aria-label="Cerrar" onclick="detail.close()">×</button><div id="detailBody"></div></dialog>
-<script src="data/partners.js?v=3.0.0"></script><script src="app.js?v=3.0.0"></script>
+<script src="data/partners.js?v=3.1.0"></script><script src="app.js?v=3.1.0"></script>
 </body>
 </html>

@@ -1,65 +1,30 @@
-# Partner Hub 3.0 — motor Python y corte de julio
+# Partner Hub — consulta de equipo y tiendas
 
-Partner Hub conserva las vistas Partner, Aniversarios y Cumpleaños, los KPIs, la jerarquía, los filtros dependientes, la búsqueda, el detalle del partner, “Juntémonos Más” y la exportación para impresión. El archivo `data/Query.xlsx` es ahora la fuente única y `data/partners.js` se genera automáticamente.
+Las vistas **Partner**, **Aniversarios** y **Cumpleaños** se alimentan de `data/Query.xlsx`. El motor Python cruza cada fila con `data/Directorio.xlsx` por CeCo, prepara los filtros Región → DM → Tienda y genera los datos para el sitio. El encabezado muestra el tamaño y la fecha de la carga validada.
 
-## Corte validado
+## Contrato de los archivos
 
-- Fecha detectada en `MES`: **31 de julio de 2026**.
-- Campos detectados: **32/32**.
-- Filas fuente y partners activos publicados: **13,724**.
-- Empleados duplicados: **0**.
-- Fechas inválidas: **0**.
-- Regiones: **11**; DM: **74**; tiendas: **961**.
-- Contra el corte anterior: 544 incorporaciones al conjunto, 719 salidas y variación neta de −175.
+| Archivo | Columnas mínimas (en cualquier orden) | Uso |
+| --- | --- | --- |
+| `data/Query.xlsx`, hoja `query` | `NUM_EMP`, `NOMBRE`, `F_INGRESO`, `F_BAJA`, `CCOSTO`, `TURNO`, `NOM_PUESTO`, `F.NAC` | Partners activos y celebraciones |
+| `data/Directorio.xlsx`, hoja `Directorio` | `CC`, `CC Nombre`, `Región`, `Estatus`, `DM` | Nombre oficial de tienda, región y DM |
 
-El motor publica únicamente filas cuyo campo `STATUS_ EMP (ACTIVO/BAJA)` contiene un estado activo. Las bajas siguen auditándose, pero no aparecen en el directorio operativo.
+Python normaliza espacios, mayúsculas y acentos de los encabezados. Toma los **últimos cinco dígitos** de `CCOSTO` como CeCo y exige coincidencia exacta con `CC`. Los códigos con letras o fracciones, un CeCo sin tienda o cerrada, y las fichas duplicadas contradictorias detienen la generación. Una ficha idéntica repetida se cuenta y publica una sola vez. Las filas con `F_BAJA` se excluyen. Si el nombre de tienda del Query difiere del Directorio, se usa el oficial y se cuenta en la auditoría.
 
-## Actualización local
+La página publica nombre, fecha de ingreso, CeCo, tienda, turno, puesto, región, DM y **solo día y mes** de cumpleaños. No publica número de empleado, fecha completa de nacimiento ni género. El buscador permite consultar nombre, tienda, puesto, turno y CeCo.
 
-Requiere Python 3.11 o superior.
+## Actualizar y comprobar
+
+Requiere Python 3.11 o superior:
 
 ```bash
-python -m venv .venv
-source .venv/bin/activate
 pip install -r requirements.txt
-python actualizar_partner_hub.py --expected-month 7 --expected-year 2026
 python -m unittest discover -s tests -v
+python actualizar_partner_hub.py
+python engine/package_site.py --source . --output build/site
 python -m http.server 8000
 ```
 
-Abre `http://localhost:8000`.
+Abre `http://localhost:8000`. Reemplaza **ambos** libros en `data/` y vuelve a ejecutar el generador. `build/auditoria_query.json` registra conteos, diferencias y hashes SHA-256 de ambas fuentes. `package_site.py` rechaza una publicación si `data/partners.js` o la auditoría no corresponden a los libros actuales. Si se necesita comprobar un mes o año de carga: `python actualizar_partner_hub.py --expected-month 9 --expected-year 2026`.
 
-Cada ejecución crea `build/auditoria_query.json`. El proceso falla si falta cualquiera de los 32 encabezados, si hay empleados activos duplicados, si las fechas no son válidas o si el mes/año no coincide con lo esperado.
-
-## Navegación optimizada
-
-- Python genera el índice Región → DM → Tienda junto con los datos.
-- Los selectores ya no reconstruyen la jerarquía recorriendo las 13 mil filas en cada apertura.
-- Solo se renderiza la sección visible; aniversarios y cumpleaños se calculan al entrar a su pestaña.
-- Las búsquedas usan una pausa breve para evitar renders por cada pulsación.
-- Las pestañas conservan su URL (`#partner`, `#anniv`, `#birth`) y admiten flechas, Inicio y Fin desde teclado.
-- El mes inicial de celebraciones se toma del corte del Query: julio.
-- El estado superior muestra la fecha real de actualización.
-
-## Workflow de GitHub
-
-`.github/workflows/actualizar-partner-hub.yml` ejecuta pruebas, regenera datos, produce la auditoría y publica GitHub Pages.
-
-1. Reemplaza `data/Query.xlsx` con el nuevo archivo mensual, conservando el nombre.
-2. Sube el cambio a `main`.
-3. En **Settings → Pages**, selecciona **GitHub Actions** como fuente.
-4. También puedes ejecutar el workflow manualmente y escribir el número de mes esperado.
-
-## Estructura
-
-```text
-.
-├── .github/workflows/actualizar-partner-hub.yml
-├── engine/partner_engine/       # lectura, validación e índice de navegación
-├── data/Query.xlsx              # fuente única
-├── data/partners.js             # salida generada; no editar
-├── tests/                       # pruebas del motor
-├── app.js / index.html / styles.css
-└── build/auditoria_query.json   # informe generado
-```
-
+El corte del archivo generado es la **fecha de ejecución**; no se infiere a partir de datos personales. El mes inicial de las vistas de celebraciones sigue ese corte. En GitHub, el workflow se ejecuta al modificar Query, Directorio, motor o interfaz, regenera la auditoría y publica GitHub Pages. También permite indicar un mes esperado al lanzarlo manualmente. Para una carga privada se necesita control de acceso en el hosting: el contenido de GitHub Pages puede ser consultado por quien tenga acceso a la página.
