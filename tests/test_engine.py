@@ -10,10 +10,13 @@ from engine.partner_engine.generator import (
     RUNTIME_HEADERS, build_navigation, build_partner_data, ceco_from_ccosto, directory_ceco,
     employee_id, is_active_status, iso_date,
 )
+from tools.audit_sources import audit_sources
 
 
 class PartnerEngineTests(unittest.TestCase):
     def test_ccosto_uses_last_five_digits_only(self):
+        self.assertEqual(ceco_from_ccosto("01938262"), "38262")
+        self.assertNotEqual(ceco_from_ccosto("01938262"), "38362")
         self.assertEqual(ceco_from_ccosto("01538656"), "38656")
         self.assertEqual(ceco_from_ccosto(1538656), "38656")
         self.assertEqual(ceco_from_ccosto("00042"), "00042")
@@ -68,6 +71,9 @@ class WorkbookIntegrationTests(unittest.TestCase):
             sheet = book.active
             sheet.title = sheet_name
             sheet.append(headers)
+            if path == self.query:
+                sheet["L1"] = "Corte de información"
+                sheet["M1"] = date(2026, 9, 28)
             for row in rows:
                 sheet.append([row.get(header) for header in headers])
             book.save(path)
@@ -89,6 +95,7 @@ class WorkbookIntegrationTests(unittest.TestCase):
         self.assertNotIn("000123", data)
         audit = json.loads(self.audit.read_text(encoding="utf-8"))
         self.assertEqual(audit["queryStoreNameDifferences"], 1)
+        self.assertEqual(audit["periodEnd"], "2026-09-28")
 
     def test_identical_duplicate_and_terminated_are_excluded(self):
         self.query_rows.append(dict(self.query_rows[0]))
@@ -126,6 +133,40 @@ class WorkbookIntegrationTests(unittest.TestCase):
         self.query_headers.append("NOMBRE")
         with self.assertRaisesRegex(ValueError, "Encabezado duplicado"):
             self.build()
+
+    def test_cutoff_is_required_and_does_not_follow_execution_date(self):
+        self.save()
+        from openpyxl import load_workbook
+        book = load_workbook(self.query)
+        book.active["M1"] = None
+        book.save(self.query)
+        with self.assertRaisesRegex(ValueError, "M1"):
+            build_partner_data(self.query, self.output, self.audit, directory_path=self.directory)
+        self.assertFalse(self.output.exists())
+        self.save()
+        with self.assertRaisesRegex(ValueError, "no coincide"):
+            build_partner_data(self.query, self.output, self.audit, directory_path=self.directory,
+                               as_of=date(2026, 9, 29))
+
+    def test_name_matching_another_ceco_blocks_wrong_dm(self):
+        self.directory_rows.append({"CC": 38362, "CC Nombre": "Nombre anterior", "Región": "Otra",
+                                    "Estatus": "Abierta", "DM": "Otro DM"})
+        with self.assertRaisesRegex(ValueError, "CeCos distintos"):
+            self.build()
+
+    def test_future_termination_remains_active_at_cutoff(self):
+        self.query_rows[0]["F_BAJA"] = date(2026, 10, 1)
+        result = self.build()
+        self.assertEqual(result.published_rows, 1)
+
+    def test_preflight_reports_missing_ceco_without_employee_details(self):
+        self.query_rows.append({**self.query_rows[0], "CCOSTO": "01938362", "NUM_EMP": 555,
+                                "NOMBRE": "Persona privada"})
+        self.save()
+        report = audit_sources(self.query, self.directory)
+        self.assertFalse(report["canPublish"])
+        self.assertEqual(report["missingCeCos"], [{"ceco": "38362", "rows": 1}])
+        self.assertNotIn("Persona privada", json.dumps(report, ensure_ascii=False))
 
     def test_output_cannot_replace_source_book(self):
         self.save()

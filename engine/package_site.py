@@ -29,10 +29,12 @@ def main() -> int:
         actual = hashlib.sha256((source / file_name).read_bytes()).hexdigest()
         if meta.get(field) != actual or audit.get(field) != actual:
             raise ValueError(f"Carga desactualizada respecto a {file_name}")
+    if meta.get("periodEnd") != audit.get("periodEnd") or not meta.get("periodEnd"):
+        raise ValueError("Corte M1 inconsistente entre auditoría y sitio")
     if not rows or len(rows) != meta.get("publishedRows") or audit.get("publishedRows") != len(rows):
         raise ValueError("Conteo de partners inconsistente entre fuentes y sitio")
-    if output == source:
-        raise ValueError("La carpeta de salida no puede ser la fuente")
+    if output != source / "build" / "site":
+        raise ValueError("Salida permitida: build/site dentro del proyecto")
     if output.exists():
         shutil.rmtree(output)
     output.mkdir(parents=True)

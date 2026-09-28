@@ -90,6 +90,20 @@ def iso_date(value: Any) -> str:
             pass
     raise ValueError("Fecha no reconocida en Query")
 
+def query_cutoff(sheet: Any) -> date:
+    """M1 es el corte explícito del Query; nunca se sustituye por la fecha del build."""
+    label = sort_key(sheet["L1"].value)
+    if "corte" not in label:
+        raise ValueError("Query L1 debe indicar 'Corte de información'")
+    try:
+        value = iso_date(sheet["M1"].value)
+        cutoff = date.fromisoformat(value)
+    except (ValueError, TypeError) as error:
+        raise ValueError("Query M1 requiere una fecha de corte válida") from error
+    if not value or cutoff > date.today():
+        raise ValueError("Query M1 requiere una fecha de corte válida, no futura")
+    return cutoff
+
 def find_header_row(sheet: Any, expected: Iterable[str], max_rows: int = 10) -> tuple[int, list[str]]:
     required = {header_key(name) for name in expected}
     for row_number, row in enumerate(sheet.iter_rows(min_row=1, max_row=max_rows, values_only=True), 1):
@@ -201,11 +215,6 @@ def build_partner_data(
         raise ValueError("Query, Directorio, salida y auditoría requieren rutas diferentes")
     if not excel.is_file():
         raise FileNotFoundError(f"Falta Query.xlsx: {excel}")
-    as_of = as_of or date.today()
-    if expected_month is not None and as_of.month != expected_month:
-        raise ValueError(f"Mes de carga esperado {expected_month}; fecha de carga {as_of:%Y-%m-%d}")
-    if expected_year is not None and as_of.year != expected_year:
-        raise ValueError(f"Año de carga esperado {expected_year}; fecha de carga {as_of:%Y-%m-%d}")
     stores, conflicts, directory_audit = load_directory(directory)
     workbook = load_workbook(excel, read_only=True, data_only=True)
     try:
@@ -213,43 +222,57 @@ def build_partner_data(
         if len(matches) != 1:
             raise ValueError(f"No se encontró una sola pestaña Query: {workbook.sheetnames}")
         sheet = workbook[matches[0]]
+        cutoff = query_cutoff(sheet)
+        if as_of is not None and as_of != cutoff:
+            raise ValueError(f"--as-of {as_of} no coincide con el corte M1 {cutoff}")
+        if expected_month is not None and cutoff.month != expected_month:
+            raise ValueError(f"Mes esperado {expected_month}; corte M1 {cutoff}")
+        if expected_year is not None and cutoff.year != expected_year:
+            raise ValueError(f"Año esperado {expected_year}; corte M1 {cutoff}")
         first, headers = find_header_row(sheet, EXPECTED_HEADERS)
         columns = column_positions(headers)
+        name_to_cecos: dict[str, set[str]] = defaultdict(set)
+        for code, store in stores.items():
+            name_to_cecos[sort_key(store["store"])].add(code)
         source_rows = terminated = name_mismatches = identical_rows = 0
         published: list[list[Any]] = []
         seen: dict[str, tuple[Any, ...]] = {}
-        for row in sheet.iter_rows(min_row=first + 1, values_only=True):
+        for row_number, row in enumerate(sheet.iter_rows(min_row=first + 1, values_only=True), first + 1):
             if not any(value is not None for value in row):
                 continue
             source_rows += 1
+            termination = iso_date(cell(row, columns, "F_BAJA"))
+            if termination and date.fromisoformat(termination) <= cutoff:
+                terminated += 1
+                continue
             number = employee_id(cell(row, columns, "NUM_EMP"))
             name = clean_text(cell(row, columns, "NOMBRE"))
             ceco = ceco_from_ccosto(cell(row, columns, "CCOSTO"))
             if not number or not name or not ceco:
-                raise ValueError(f"Fila Query {first + source_rows}: empleado, nombre o CCOSTO inválido")
+                raise ValueError(f"Fila Query {row_number}: empleado, nombre o CCOSTO inválido")
             if ceco in conflicts:
                 raise ValueError(f"Directorio contradictorio para CeCo {ceco}")
             if ceco not in stores:
                 raise ValueError(f"CeCo {ceco} de Query no existe en Directorio")
             store = stores[ceco]
             if sort_key(store["status"]) != "abierta":
-                raise ValueError(f"CeCo {ceco} no está abierto en Directorio")
+                raise ValueError(f"CeCo {ceco} no está abierto en Directorio ({store['status']})")
+            query_name = sort_key(cell(row, columns, "NOM_CCOSTO")) if header_key("NOM_CCOSTO") in columns else ""
+            other_cecos = name_to_cecos.get(query_name, set()) - {ceco}
+            if query_name and query_name != sort_key(store["store"]) and other_cecos:
+                raise ValueError(f"Query fila {row_number}: CCOSTO {ceco} y NOM_CCOSTO apuntan a CeCos distintos ({', '.join(sorted(other_cecos))})")
             hire, birth = iso_date(cell(row, columns, "F_INGRESO")), iso_date(cell(row, columns, "F.NAC"))
-            if not hire or not birth or date.fromisoformat(hire) > as_of or date.fromisoformat(birth) > as_of:
-                raise ValueError(f"Fechas inválidas o posteriores al corte en Query, fila {first + source_rows}")
-            termination = iso_date(cell(row, columns, "F_BAJA"))
-            if termination:
-                terminated += 1
-                continue
+            if not hire or not birth or date.fromisoformat(hire) > cutoff or date.fromisoformat(birth) > cutoff:
+                raise ValueError(f"Fechas inválidas o posteriores al corte en Query, fila {row_number}")
             shift, role = clean_text(cell(row, columns, "TURNO")), clean_text(cell(row, columns, "NOM_PUESTO"))
             if not shift or not role:
-                raise ValueError(f"Turno o puesto vacío en Query, fila {first + source_rows}")
+                raise ValueError(f"Turno o puesto vacío en Query, fila {row_number}")
             if header_key("NOM_CCOSTO") in columns and sort_key(cell(row, columns, "NOM_CCOSTO")) != sort_key(store["store"]):
                 name_mismatches += 1
             values = (name, hire, ceco, store["store"], shift, role, store["region"], store["dm"], f"--{birth[5:]}")
             if number in seen:
                 if seen[number] != values:
-                    raise ValueError(f"Empleado duplicado con datos contradictorios en Query, fila {first + source_rows}")
+                    raise ValueError(f"Empleado duplicado con datos contradictorios en Query, fila {row_number}")
                 identical_rows += 1
                 continue
             seen[number] = values
@@ -263,8 +286,9 @@ def build_partner_data(
     unique_stores = {row[RUNTIME_HEADERS.index("CECO")] for row in published}
     meta = {
         "source": excel.name, "directory": directory.name, "sheet": matches[0],
-        "version": f"{as_of:%Y-%m-%d}-directorio-ceco", "generatedOn": as_of.isoformat(),
-        "month": as_of.month, "monthName": MONTHS[as_of.month - 1], "year": as_of.year,
+        "version": f"{cutoff:%Y-%m-%d}-directorio-ceco", "generatedOn": date.today().isoformat(),
+        "periodEnd": cutoff.isoformat(),
+        "month": cutoff.month, "monthName": MONTHS[cutoff.month - 1], "year": cutoff.year,
         "sourceRows": source_rows, "publishedRows": len(published),
         "stores": len(unique_stores), "regions": len(navigation),
         "sourceSha256": _digest(excel), "directorySha256": _digest(directory),
@@ -282,5 +306,5 @@ def build_partner_data(
         js += f"window.PARTNER_{key}=" + json.dumps(value, ensure_ascii=False, separators=(",", ":"), allow_nan=False) + ";\n"
     _atomic_write(output, js)
     _atomic_write(audit_output, json.dumps(audit, ensure_ascii=False, indent=2, allow_nan=False) + "\n")
-    return BuildResult(source_rows, len(published), as_of.isoformat(), as_of.month, as_of.year,
+    return BuildResult(source_rows, len(published), cutoff.isoformat(), cutoff.month, cutoff.year,
                        len(navigation), len(unique_dms), len(unique_stores), str(output_path), str(audit_path))

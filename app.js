@@ -108,7 +108,7 @@ function scheduleRender(id){
   if(isSearch)renderTimer=setTimeout(renderActive,120);else renderActive();
 }
 function init(){
-  const status=$('dataStatus');if(status)status.textContent=META.generatedOn?`Carga validada ${new Date(META.generatedOn+'T00:00:00').toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'numeric'}).replace(/\./g,'')}`:'Datos no disponibles';
+  const status=$('dataStatus');if(status)status.textContent=META.periodEnd?`Corte ${new Date(META.periodEnd+'T00:00:00').toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'numeric'}).replace(/\./g,'')}`:'Datos no disponibles';
   const scope=$('dataScope');if(scope)scope.textContent=META.publishedRows?`${META.publishedRows.toLocaleString('es-MX')} partners · ${META.stores} tiendas · ${META.regions} región${META.regions===1?'':'es'}`:'Sin datos validados';
   $('hierarchy').addEventListener('click',event=>{const button=event.target.closest('[data-partner-index]');if(button){const person=R[Number(button.dataset.partnerIndex)];if(person)showDetail(person);}});
   const tabs=[...document.querySelectorAll('.tab')];
@@ -123,7 +123,7 @@ function init(){
   ['pRegion','pDM','pStore','pRole','pShift','pSearch','aRegion','aDM','aStore','aMonth','aSearch','bRegion','bDM','bStore','bMonth','bSearch'].forEach(id=>$(id)?.addEventListener('input',()=>{persistFilters();scheduleRender(id);}));
   const initial=location.hash.slice(1);activateTab(['partner','anniv','birth'].includes(initial)?initial:'partner',{updateHash:false});
   window.addEventListener('hashchange',()=>activateTab(location.hash.slice(1),{updateHash:false}));
-  if('serviceWorker'in navigator)navigator.serviceWorker.register('sw.js?v=partner-hub-v6');
+  if('serviceWorker'in navigator)navigator.serviceWorker.register('sw.js?v=partner-hub-v7');
 }
 function geographicBase(prefix){
   const region=$(prefix+'Region')?.value||'',dm=$(prefix+'DM')?.value||'',store=$(prefix+'Store')?.value||'';
